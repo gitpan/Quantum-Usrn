@@ -13,4 +13,3 @@ ok(Usrn(Usrn(0xffffffff)), 0, "zero");
 
 my $txt = "Just another Perl Hacker";
 ok(Usrn(Usrn($txt)), ~$txt, "not text");
-

@@ -1,25 +1,23 @@
 package Quantum::Usrn;
 
-require v5.6;
 use strict;
-use warnings;
 use Crypt::Blowfish;
-
-our $VERSION = '0.01';
+$Quantum::Usrn::VERSION = '1.00';
 
 my $key = pack('H*', q{4d61727479205061756c6579203c6d61727479406b617365692e636f6d3e0a4a75737420416e6f74686572205065726c204861636b65720a});
 my $cipher = Crypt::Blowfish->new($key);
 
 sub _generate_noise {
   my $data = shift;
-  my $result;
+  my $x = pack('NN', rand(2**32), rand(2**32));
+  my $result = $x;
   if ((~$data & $data) eq 0 and $data==int $data) {
-    my $b0 = $result = $cipher->encrypt(pack('a4N', 'srn#', int(rand(2**32))));
-    $result .= $cipher->encrypt($b0 ^ pack('NN', $data, int(rand(2**32))));
+    $result .= $x = $cipher->encrypt($x ^ pack('a4N', 'srn#', int(rand(2**32))));
+    $result .= $x = $cipher->encrypt($x ^ pack('NN', $data, int(rand(2**32))));
   } else {
-    my $b0 = $result = $cipher->encrypt(pack('a4N', 'srn$', int(rand(2**32))));
+    $result .= $x = $cipher->encrypt($x ^ pack('a4N', 'srn$', int(rand(2**32))));
     foreach my $four ($data=~/.{1,4}/ogs) {
-      $result .= $b0 = $cipher->encrypt($b0 ^ pack('a4N', $four, int(rand(2**32))));
+      $result .= $x = $cipher->encrypt($x ^ pack('a4N', $four, int(rand(2**32))));
     }
   }
   return $result;
@@ -27,18 +25,19 @@ sub _generate_noise {
 
 sub _filter_noise {
   my $data = shift;
-  my ($b0, @block) = $data=~/.{8}/ogs;
+  my ($x, $b0, @block) = $data=~/.{8}/ogs;
   return undef unless defined $b0;
-  my ($type) = substr($cipher->decrypt($b0), 0, 4) =~ /^srn([#\$])$/;
+  my ($type) = substr($x ^ $cipher->decrypt($b0), 0, 4) =~ /^srn([#\$])$/;
+  $x = $b0;
   return undef unless defined $type;
   my $result;
   if ($type eq '#') {
-    $result = (unpack('NN', $b0 ^ $cipher->decrypt($block[0])))[0];
+    $result = (unpack('NN', $x ^ $cipher->decrypt($block[0])))[0];
   } else {
     foreach my $block (@block) {
-      my $txt = $b0 ^ $cipher->decrypt($block);
+      my $txt = $x ^ $cipher->decrypt($block);
       $result .= substr($txt, 0, 4);
-      $b0 = $block;
+      $x = $block;
     }
   }
   return $result;
@@ -105,18 +104,17 @@ Marty Pauley E<lt>marty@kasei.comE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2001  Marty Pauley.
+  Copyright (C) 2001  Kasei
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of either:
-a) the GNU General Public License as published by the Free Software Foundation;
-   either version 2 of the License, or (at your option) any later version.
-b) the Perl Artistic License.
+  This program is free software; you can redistribute it and/or modify it
+  under the terms of either:
+  a) the GNU General Public License;
+     either version 2 of the License, or (at your option) any later version.
+  b) the Perl Artistic License.
 
-This module is distributed in the hope that it will be useful,
-although I doubt that it will be.  There is NO WARRANTY, not
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE; I can't think of any particular purpose
-that it would be fit for.
+  This module is distributed in the hope that it will be useful, although I
+  doubt that it will be.  There is NO WARRANTY, not even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE; I can't think of any
+  particular purpose that it would be fit for.
 
 =cut
